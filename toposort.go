@@ -1,7 +1,10 @@
 // Topological sorting
 package main
 
-import "fmt"
+import (
+    "fmt"
+    "sort"
+)
 
 type Graph = map[string][]string
 
@@ -18,38 +21,31 @@ var courses = Graph {
     "programming languages": {"data structures", "computer organization"},
 }
 
-func (g *Graph) TopologicalSort() []string {
-    seen := make(map[string]bool)
-    order := make([]string, 0)
-    var visit func (string)
-
-    visit = func (item string) {
-
-    }
-}
-
 func main() {
     for i, course := range TopologicalSort(courses) {
-        fmt.Printf("%02d: %v\n", i+1, course)
+        fmt.Printf("%02d\t%v\n", i+1, course)
     }
 }
+
+type OrderedItem interface {
+    Order() int
+}
+
+type OrderedCollection []OrderedItem
+func (c OrderedCollection) Len() int { return len(c) }
+func (c OrderedCollection) Less(i, j int) bool { return c[i].Order() < c[j].Order() }
+func (c OrderedCollection) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
 
 type Vertex struct {
     Item string
     ChildrenCount int
 }
 
-type Vertices = []Vertex
+func (v Vertex) Order() int { return v.ChildrenCount }
 
-func (vs *Vertices) Len() int { return len(*vs) }
-
-func (vs *Vertices) Less(i, j int) bool { return (*vs)[i].ChildrenCount < (*vs)[j].ChildrenCount }
-
-func (vs *Vertices) Swap(i, j int) { (*vs)[i], (*vs)[j] = (*vs)[j], (*vs)[i] }
-
-func TopologicalSort(m map[string][]string) [] string {
+func TopologicalSort(m map[string][]string) []string {
     seen := make(map[string]bool)
-    order := make([]Vertex, 0)
+    order := make(OrderedCollection, 0)
     var visit func (string)
 
     visit = func (item string) {
@@ -64,7 +60,13 @@ func TopologicalSort(m map[string][]string) [] string {
 
     for key := range m { visit(key) }
 
-
-    return order
+    sort.Sort(order)
+    orderedStrings := make([]string, 0)
+    for _, item := range order {
+        vertex := item.(Vertex)
+        formatted := fmt.Sprintf("%s (%d)", vertex.Item, vertex.ChildrenCount)
+        orderedStrings = append(orderedStrings, formatted)
+    }
+    return orderedStrings
 }
 
