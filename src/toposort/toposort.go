@@ -1,5 +1,5 @@
 // Topological sorting
-package main
+package toposort
 
 import (
     "fmt"
@@ -22,19 +22,10 @@ var courses = Graph {
 }
 
 func main() {
-    for i, course := range TopologicalSort(courses) {
+    for i, course := range Sort(courses) {
         fmt.Printf("%02d\t%v\n", i+1, course)
     }
 }
-
-type OrderedItem interface {
-    Order() int
-}
-
-type OrderedCollection []OrderedItem
-func (c OrderedCollection) Len() int { return len(c) }
-func (c OrderedCollection) Less(i, j int) bool { return c[i].Order() < c[j].Order() }
-func (c OrderedCollection) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
 
 type Vertex struct {
     Item string
@@ -43,7 +34,9 @@ type Vertex struct {
 
 func (v Vertex) Order() int { return v.ChildrenCount }
 
-func TopologicalSort(m map[string][]string) []string {
+// Sort topologically sorts graph.
+// The vertices without direct dependencies are printed in alphabetical order.
+func Sort(m map[string][]string) []string {
     seen := make(map[string]bool)
     order := make(OrderedCollection, 0)
     var visit func (string)
@@ -61,12 +54,28 @@ func TopologicalSort(m map[string][]string) []string {
     for key := range m { visit(key) }
 
     sort.Sort(order)
-    orderedStrings := make([]string, 0)
+    orderedGroups := make(map[int][]string)
+    maxOrder := 0
+
     for _, item := range order {
         vertex := item.(Vertex)
         formatted := fmt.Sprintf("%s (%d)", vertex.Item, vertex.ChildrenCount)
-        orderedStrings = append(orderedStrings, formatted)
+        group := orderedGroups[vertex.Order()]
+        orderedGroups[vertex.Order()] = append(group, formatted)
+        maxOrder = maxInt(vertex.Order(), maxOrder)
     }
+
+    orderedStrings := make([]string, 0)
+    for i := 0; i <= maxOrder; i++ {
+        group := orderedGroups[i]
+        sort.Strings(group)
+        orderedStrings = append(orderedStrings, group...)
+    }
+
     return orderedStrings
 }
 
+func maxInt(a, b int) int {
+    if a >= b { return a }
+    return b
+}
