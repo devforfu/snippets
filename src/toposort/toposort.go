@@ -21,12 +21,6 @@ var courses = Graph {
     "programming languages": {"data structures", "computer organization"},
 }
 
-func main() {
-    for i, course := range Sort(courses) {
-        fmt.Printf("%02d\t%v\n", i+1, course)
-    }
-}
-
 type Vertex struct {
     Item string
     ChildrenCount int
@@ -34,24 +28,49 @@ type Vertex struct {
 
 func (v Vertex) Order() int { return v.ChildrenCount }
 
+// MustSort topologically sorts graph or panics in case if cycle discovered
+func MustSort(m Graph) []string {
+    sorted, err := Sort(m)
+    if err != nil { panic(err) }
+    return sorted
+}
+
 // Sort topologically sorts graph.
 // The vertices without direct dependencies are printed in alphabetical order.
-func Sort(m map[string][]string) []string {
-    seen := make(map[string]bool)
+// Returns error if cycle discovered.
+func Sort(m Graph) ([]string, error) {
+    const (
+        White = iota
+        Gray
+        Black
+    )
+    seen := make(map[string]int)
     order := make(OrderedCollection, 0)
-    var visit func (string)
 
-    visit = func (item string) {
-        if !seen[item] {
-            seen[item] = true
+    var visit func (string) error
+
+    visit = func (item string) (err error) {
+        if seen[item] == White {
+            seen[item] = Gray
             for _, child := range m[item] {
-                visit(child)
+                if seen[child] == Gray {
+                    return fmt.Errorf("cycle discovered: %s <--> %s", item, child)
+                }
+                if err = visit(child); err != nil {
+                    return err
+                }
             }
             order = append(order, Vertex{item, len(m[item])})
+            seen[item] = Black
         }
+        return
     }
 
-    for key := range m { visit(key) }
+    for key := range m {
+        if err := visit(key); err != nil {
+            return nil, err
+        }
+    }
 
     sort.Sort(order)
     orderedGroups := make(map[int][]string)
@@ -72,7 +91,7 @@ func Sort(m map[string][]string) []string {
         orderedStrings = append(orderedStrings, group...)
     }
 
-    return orderedStrings
+    return orderedStrings, nil
 }
 
 func maxInt(a, b int) int {
