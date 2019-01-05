@@ -3,6 +3,7 @@ package main
 import (
     "bufio"
     "fmt"
+    "io"
 )
 
 type ByteCounter int
@@ -29,6 +30,24 @@ func (c *WordCounter) Reset() {
     *c = 0
 }
 
+type Wrapper struct {
+    wrapped io.Writer
+    counter int64
+}
+func (w *Wrapper) Write(p []byte) (int, error) {
+    n, err := w.wrapped.Write(p)
+    if err != nil { return 0, err }
+    w.counter += int64(n)
+    return n, nil
+}
+
+func CountingWriter(w io.Writer) (io.Writer, *int64) {
+    wrapper := Wrapper{wrapped: w}
+    var writer io.Writer = &wrapper
+    i := wrapper.counter
+    return writer, &i
+}
+
 func main() {
     var c ByteCounter
     c.Write([]byte("Hello"))
@@ -51,5 +70,4 @@ func main() {
         fmt.Printf("%-30s % 5d\n", word, wc)
         wc.Reset()
     }
-
 }
