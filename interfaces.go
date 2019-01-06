@@ -4,6 +4,7 @@ import (
     "bufio"
     "fmt"
     "io"
+    "os"
 )
 
 type ByteCounter int
@@ -30,11 +31,11 @@ func (c *WordCounter) Reset() {
     *c = 0
 }
 
-type Wrapper struct {
+type wrapper struct {
     wrapped io.Writer
     counter int64
 }
-func (w *Wrapper) Write(p []byte) (int, error) {
+func (w *wrapper) Write(p []byte) (int, error) {
     n, err := w.wrapped.Write(p)
     if err != nil { return 0, err }
     w.counter += int64(n)
@@ -42,10 +43,9 @@ func (w *Wrapper) Write(p []byte) (int, error) {
 }
 
 func CountingWriter(w io.Writer) (io.Writer, *int64) {
-    wrapper := Wrapper{wrapped: w}
+    wrapper := wrapper{wrapped: w}
     var writer io.Writer = &wrapper
-    i := wrapper.counter
-    return writer, &i
+    return writer, &wrapper.counter
 }
 
 func main() {
@@ -70,4 +70,14 @@ func main() {
         fmt.Printf("%-30s % 5d\n", word, wc)
         wc.Reset()
     }
+
+    var writer io.Writer
+    writer, err := os.Create("file.txt")
+    if err != nil { os.Exit(1) }
+    writer, count := CountingWriter(writer)
+    lines := []string{"First", "Second", "Third"}
+    for _, line := range lines {
+        writer.Write([]byte(line + "\n"))
+    }
+    fmt.Printf("Number of bytes written: %d", *count)
 }
