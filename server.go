@@ -10,6 +10,7 @@ import (
 func main() {
     db := store{"shoes": 50, "socks": 5}
     mux := http.NewServeMux()
+    mux.Handle("/", http.HandlerFunc(notFound))
     mux.Handle("/list", http.HandlerFunc(db.list))
     mux.Handle("/price", http.HandlerFunc(db.price))
     log.Fatal(http.ListenAndServe("localhost:8080", mux))
@@ -39,4 +40,8 @@ func (db store) price(w http.ResponseWriter, req *http.Request) {
     } else {
         encoder.Encode(response{"success": true, "item": item, "price": price})
     }
+}
+
+func notFound(w http.ResponseWriter, req *http.Request) {
+    json.NewEncoder(w).Encode(response{"error": "not found"})
 }
