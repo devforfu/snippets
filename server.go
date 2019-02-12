@@ -1,6 +1,7 @@
 package main
 
 import (
+    "encoding/json"
     "fmt"
     "log"
     "net/http"
@@ -16,20 +17,26 @@ func main() {
 
 type dollars int64
 type store map[string]dollars
+type response map[string]interface{}
 
 func (db store) list(w http.ResponseWriter, req *http.Request) {
+    var prices = make(map[string]int)
     for item, price := range db {
-        fmt.Fprintf(w, "%s: %d\n", item, price)
+        prices[item] = int(price)
     }
+    encoder := json.NewEncoder(w)
+    encoder.Encode(&prices)
 }
 
 func (db store) price(w http.ResponseWriter, req *http.Request) {
     item := req.URL.Query().Get("item")
     price, ok := db[item]
+    encoder := json.NewEncoder(w);
     if !ok {
         w.WriteHeader(http.StatusNotFound)
-        fmt.Fprintf(w, "no such item: %q\n", item)
-        return
+        msg := response{"error": fmt.Sprintf("no such item: %q\n", item)}
+        encoder.Encode(&msg)
+    } else {
+        encoder.Encode(response{"success": true, "item": item, "price": price})
     }
-    fmt.Fprintf(w,"%d\n", price)
 }
