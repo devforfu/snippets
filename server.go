@@ -24,51 +24,73 @@ type store map[string]dollars
 type form map[string]string
 type response map[string]interface{}
 
+type JSONResponse struct {
+    http.ResponseWriter
+    *json.Encoder
+}
+
+func (r JSONResponse) SendError(message string) {
+    r.WriteHeader(http.StatusBadRequest)
+    r.Encode(response{"error": message})
+}
+
+func (r JSONResponse) SendStore(s store) {
+    r.WriteHeader(http.StatusAccepted)
+    r.Encode(s)
+}
+
+func (r JSONResponse) SendPrice(item string, price dollars) {
+    r.WriteHeader(http.StatusAccepted)
+    r.Encode(response{"item": item, "price": price})
+}
+
+func (r JSONResponse) SendSuccess(resp response) {
+    r.WriteHeader(http.StatusAccepted)
+    r.Encode(resp)
+}
+
+func NewJSONResponse(w http.ResponseWriter) JSONResponse {
+    resp := JSONResponse{}
+    resp.ResponseWriter = w
+    resp.Encoder = json.NewEncoder(w)
+    return resp
+}
+
 func (db store) list(w http.ResponseWriter, req *http.Request) {
-    var prices = make(map[string]int)
-    for item, price := range db {
-        prices[item] = int(price)
-    }
-    encoder := json.NewEncoder(w)
-    encoder.Encode(&prices)
+    NewJSONResponse(w).SendStore(db)
 }
 
 func (db store) price(w http.ResponseWriter, req *http.Request) {
     item := req.URL.Query().Get("item")
-    price, ok := db[item]
-    encoder := json.NewEncoder(w)
-    if !ok {
-        w.WriteHeader(http.StatusNotFound)
-        msg := response{"error": fmt.Sprintf("no such item: %q\n", item)}
-        encoder.Encode(&msg)
+    resp := NewJSONResponse(w)
+    if price, ok := db[item]; !ok {
+        resp.SendError(fmt.Sprintf("no such item: %s", item))
     } else {
-        encoder.Encode(response{"success": true, "item": item, "price": price})
+        resp.SendPrice(item, price)
     }
 }
 
 func (db store) update(w http.ResponseWriter, req *http.Request) {
     var data form
     json.NewDecoder(req.Body).Decode(&data)
-    encoder := json.NewEncoder(w)
+    resp := NewJSONResponse(w)
     err := checkParameters(data, "item", "price")
     if err != nil {
-        sendError(w, encoder, err)
+        resp.SendError(err.Error())
         return
     }
-    key := data["item"]
-    price := data["price"]
+    key, price := data["item"], data["price"]
     value, err := strconv.ParseInt(price, 10, 64)
     if err != nil {
-        sendError(w, encoder, err)
+        resp.SendError(err.Error())
         return
     }
     var mux sync.Mutex
-    oldPrice := db[key]
     mux.Lock()
-    db[key] = dollars(value)
+    oldPrice := db[key]
     mux.Unlock()
     log.Printf("Price for item '%s' updated from %v to %v", key, oldPrice, value)
-    encoder.Encode(response{"item": key, "old": oldPrice, "new": value})
+    resp.SendSuccess(response{"item": key, "old": oldPrice, "new": value})
 }
 
 func checkParameters(data form, keys ...string) error {
@@ -78,12 +100,6 @@ func checkParameters(data form, keys ...string) error {
         }
     }
     return nil
-}
-
-func sendError(w http.ResponseWriter, e *json.Encoder, err error) {
-    w.WriteHeader(http.StatusNotFound)
-    msg := response{"error": err.Error()}
-    e.Encode(&msg)
 }
 
 func notFound(w http.ResponseWriter, req *http.Request) {
