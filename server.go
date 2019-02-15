@@ -43,5 +43,6 @@ func (db store) price(w http.ResponseWriter, req *http.Request) {
 }
 
 func notFound(w http.ResponseWriter, req *http.Request) {
+    log.Printf("Not found page request: [%s] %s", req.RemoteAddr, req.RequestURI)
     json.NewEncoder(w).Encode(response{"error": "not found"})
 }
