@@ -76,12 +76,14 @@ func (db store) update(w http.ResponseWriter, req *http.Request) {
     resp := NewJSONResponse(w)
     err := checkParameters(data, "item", "price")
     if err != nil {
+        log.Printf("invalid update: %v", data)
         resp.SendError(err.Error())
         return
     }
     key, price := data["item"], data["price"]
     value, err := strconv.ParseInt(price, 10, 64)
     if err != nil {
+        log.Printf("invalid update: %v", data)
         resp.SendError(err.Error())
         return
     }
@@ -96,7 +98,7 @@ func (db store) update(w http.ResponseWriter, req *http.Request) {
 func checkParameters(data form, keys ...string) error {
     for _, key := range keys {
         if _, ok := data[key]; !ok {
-            return fmt.Errorf("key is missing: %s", key)
+            return fmt.Errorf("required key '%s' is missing", key)
         }
     }
     return nil

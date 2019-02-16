@@ -19,13 +19,11 @@ type JSON map[string]interface{}
 type Price float64
 type PriceList map[string]Price
 
-func (obj JSON) Read(p []byte) (n int, err error) {
-    var buf bytes.Buffer
+func (obj JSON) Buffer() (buf bytes.Buffer, err error) {
     encoder := json.NewEncoder(&buf)
     err = encoder.Encode(obj)
     if err != nil { return }
-    n, err = buf.Write(p)
-    return n, err
+    return buf, nil
 }
 
 func (c *Client) Parse() {
@@ -52,9 +50,12 @@ func (c *Client) Update(item string, price Price) (oldPrice Price, err error) {
     data := make(JSON)
     data["item"] = item
     data["price"] = price
-    update, err := c.post("/update", data)
+    buf, err := data.Buffer()
+    fmt.Printf("data=%v, buf=%v\n", data, buf)
     if err != nil { return }
-    return Price(update["oldPrice"].(float64)), err
+    update, err := c.post("/update", &buf)
+    if err != nil { return }
+    return Price(update["old"].(float64)), err
 }
 
 func (c *Client) PrintPrices(w io.Writer, prices PriceList) {
