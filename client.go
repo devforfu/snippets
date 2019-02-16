@@ -49,9 +49,9 @@ func (c *Client) MustFetchPriceList() (prices PriceList) {
 func (c *Client) Update(item string, price Price) (oldPrice Price, err error) {
     data := make(JSON)
     data["item"] = item
-    data["price"] = price
+    // without casting into string, fails to marshal
+    data["price"] = fmt.Sprintf("%v", price)
     buf, err := data.Buffer()
-    fmt.Printf("data=%v, buf=%v\n", data, buf)
     if err != nil { return }
     update, err := c.post("/update", &buf)
     if err != nil { return }
@@ -82,6 +82,17 @@ func (c *Client) post(endpoint string, data io.Reader) (result JSON, err error) 
     err = decoder.Decode(&result)
     return result, err
 }
+//
+//func (c *Client) postJSON(endpoint string, data JSON) (result JSON, err error) {
+//    jsonValue, _ := json.Marshal(data)
+//    buf := bytes.NewBuffer(jsonValue)
+//    resp, err := http.Post(c.url(endpoint), "application/json", buf)
+//    if err != nil { return }
+//    defer resp.Body.Close()
+//    decoder := json.NewDecoder(resp.Body)
+//    err = decoder.Decode(&result)
+//    return result, err
+//}
 
 func (c *Client) url(endpoint string) string {
     return fmt.Sprintf("%s%s", c.baseURL, endpoint)
@@ -93,5 +104,5 @@ func main() {
     prices := client.MustFetchPriceList()
     client.PrintPrices(os.Stdout, prices)
     oldPrice, _ := client.Update("socks", 10)
-    fmt.Printf("Old socks price was: %v", oldPrice)
+    fmt.Printf("Old socks price was: %v\n", oldPrice)
 }
