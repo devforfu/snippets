@@ -28,10 +28,17 @@ func main()  {
     }()
 
     conn, err := net.Dial("tcp", ":8080")
+    log.Printf("Connection type: %T", conn)
     if err != nil { log.Fatal(err) }
-    defer conn.Close()
-    go mustCopy(os.Stdout, conn)
+    done := make(chan struct{})
+    go func() {
+        io.Copy(os.Stdout, conn)
+        log.Println("done")
+        done <- struct{}{}
+    }()
     mustCopy(conn, os.Stdin)
+    conn.Close()
+    <- done
 }
 
 func handle(c net.Conn) {
@@ -39,7 +46,7 @@ func handle(c net.Conn) {
     log.Printf("Accepted connection: %s", c.RemoteAddr().String())
     input := bufio.NewScanner(c)
     for input.Scan() {
-        echo(c, input.Text(), 1*time.Second)
+        go echo(c, input.Text(), 1*time.Second)
     }
 }
 
