@@ -11,7 +11,9 @@ import (
     "image/jpeg"
     "image/png"
     "io"
+    "io/ioutil"
     "log"
+    "net/http"
     "os"
     "path"
     "path/filepath"
@@ -23,29 +25,110 @@ func init() {
 }
 
 func main() {
-    home, _ := homedir.Dir()
-    imagePath := path.Join(home, "Documents", "Resume", "pic.png")
-    output, err := ImageFile(imagePath)
-    if err != nil { log.Fatalf("%s", err) }
-    log.Printf("Thumbnail file: %s", output)
+    conf := parseArgs()
+    client := UnsplashClient{conf["access_key"], conf["secret_key"]}
+    client.DownloadRandomPhotos(conf["output"], 3)
+    //output, err := ImageFile(imagePath)
+    //if err != nil { log.Fatalf("%s", err) }
+    //log.Printf("Thumbnail file: %s", output)
 }
 
 func parseArgs() map[string]string {
-    defaultConfig := path.Join("config", "unsplash.json")
-    confPath := flag.String("-conf", defaultConfig, "path to file with Unsplash API config")
+    confPath := flag.String(
+        "-conf",
+        path.Join("config", "unsplash.json"),
+        "path to file with Unsplash API config")
+
+    outputPath := flag.String(
+        "-out",
+        path.Join(MustHomeDir(), "Unsplash"),
+        "path to the output folder")
+
     flag.Parse()
-
-    file, err := os.Open(*confPath)
+    data, err := ioutil.ReadFile(*confPath)
     if err != nil { log.Fatal(err) }
-    defer file.Close()
 
-    var bytes []byte
     config := make(map[string]string)
-    _, err = file.Read(bytes)
-    if err != nil { log.Fatal(err) }
-    json.Unmarshal(bytes, &config)
+    json.Unmarshal(data, &config)
+    config["output"] = *outputPath
     return config
 }
+
+func MustHomeDir() string {
+    home, err := homedir.Dir()
+    if err != nil { log.Fatal(err) }
+    return home
+}
+
+const (
+    UnsplashBaseURL = "https://api.unsplash.com/"
+    UnsplashRandomPhotos = UnsplashBaseURL + "photos/random"
+)
+
+type UnsplashClient struct {
+    AccessKey, SecretKey string
+}
+
+type UnsplashResult struct {
+    Id string `json:"id"`
+    URLs map[string]string `json:"urls"`
+}
+
+func (c *UnsplashClient) DownloadRandomPhotos(dirname string, count int) (err error) {
+    log.Printf("Downloading %d image(s) into folder %s\n", count, dirname)
+    result, err := c.GetRandomPhotos(count)
+    if err != nil { return }
+
+    log.Println("Creating folder")
+    err = os.MkdirAll(dirname, os.ModePerm)
+    if err != nil { return }
+
+    n := len(result)
+    for i, item := range result {
+        fmt.Printf("Downloading image %d of %d...\r", i+1, n)
+        imageURL := item.URLs["regular"]
+        img, err := DownloadImage(imageURL)
+        if err != nil { return err }
+
+        filename := path.Join(dirname, fmt.Sprintf("%s.jpeg", item.Id))
+        fmt.Printf("Saving downloaded image into file: %s\n", filename)
+        file, err := os.Create(filename)
+        if err != nil { return err }
+
+        err = jpeg.Encode(file, img, nil)
+        if err != nil { return err }
+
+        file.Close()
+    }
+
+    return nil
+}
+
+func (c *UnsplashClient) GetRandomPhotos(count int) (result []UnsplashResult, err error) {
+    client := http.Client{}
+    url := fmt.Sprintf("%s?client_id=%s&count=%d", UnsplashRandomPhotos, c.AccessKey, count, )
+    req, _ := http.NewRequest("GET", url, nil)
+    req.Header.Set("Authorization", fmt.Sprintf("Client-ID %s", c.SecretKey))
+
+    resp, err := client.Do(req)
+    if err != nil { return }
+    defer resp.Body.Close()
+
+    err = json.NewDecoder(resp.Body).Decode(&result)
+    if err != nil { return }
+
+    return result, nil
+}
+
+func DownloadImage(url string) (image image.Image, err error) {
+    resp, err := http.Get(url)
+    if err != nil { return }
+    defer resp.Body.Close()
+    image, err = jpeg.Decode(resp.Body)
+    if err != nil { return }
+    return image, nil
+}
+
 
 const (
     Unknown = iota
