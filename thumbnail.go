@@ -3,6 +3,8 @@
 package main
 
 import (
+    "encoding/json"
+    "flag"
     "fmt"
     "github.com/mitchellh/go-homedir"
     "image"
@@ -16,13 +18,33 @@ import (
     "strings"
 )
 
-func main() {
+func init() {
     log.SetFlags(0)
+}
+
+func main() {
     home, _ := homedir.Dir()
     imagePath := path.Join(home, "Documents", "Resume", "pic.png")
     output, err := ImageFile(imagePath)
     if err != nil { log.Fatalf("%s", err) }
     log.Printf("Thumbnail file: %s", output)
+}
+
+func parseArgs() map[string]string {
+    defaultConfig := path.Join("config", "unsplash.json")
+    confPath := flag.String("-conf", defaultConfig, "path to file with Unsplash API config")
+    flag.Parse()
+
+    file, err := os.Open(*confPath)
+    if err != nil { log.Fatal(err) }
+    defer file.Close()
+
+    var bytes []byte
+    config := make(map[string]string)
+    _, err = file.Read(bytes)
+    if err != nil { log.Fatal(err) }
+    json.Unmarshal(bytes, &config)
+    return config
 }
 
 const (
